@@ -1,0 +1,303 @@
+#!/usr/bin/env python
+
+#Import Tasks 
+from Task2 import process_views_by_country,load_country_to_map, process_views_by_continent, plot_chart
+from Task3 import process_views_by_useragent, simplify_uA, process_views_by_browser
+from Task4 import calculate_top_readers
+from Task5 import also_likes, sort_by_readers
+from Task6 import generate_dot_file, create_graph
+from Task7 import launch_gui
+from collections import defaultdict
+import re
+import os
+import sys
+import getopt
+import json
+
+# Display menu for users to select a task to complete. 
+def mainMenu(): 
+    #Display menu and Process user selection
+    while True: 
+        print("\n --- F21SC Document Tracker ---\n")
+        print("1. Task 2A: Views By Country")
+        print("2. Task 2B: Views By Continent")
+        print("3. Task 3A: Views By Browser")
+        print("4. Task 3B: Simplified Browser Views")
+        print("5. Task 4: Reader Profiles")
+        print("6. Task 5D: 'Also Likes' Functionality")
+        print("7. Task 6:'Also Likes' Graph")
+        print("8. Task 7: Launch GUI")
+        print("9. Exit")
+
+        choice = input("Select a Task to perform: ")
+
+        if choice == "1":
+            task2a()
+        elif choice == "2": 
+            task2B()
+        elif choice == "3": 
+            task3A()
+        elif choice == "4": 
+            task3B()
+        elif choice == "5": 
+            task4()
+        elif choice == "6": 
+            task5D()
+        elif choice == "7": 
+            task6()
+        elif choice == "8": 
+            task7()
+        elif choice == "9": 
+            print("Exiting program...")
+            break
+        else: 
+            print("Invalid choice. Please select a valid option...")
+
+def task2a(): 
+    "Task 2A: Views by Country"
+    doc_id = input("Document ID: ")
+    json_file_path = input("Enter the path to JSON file: ")
+
+    try:
+        country_views = process_views_by_country(doc_id, json_file_path)
+        plot_chart(country_views, "Views by country", "Country", "View Count")
+        print("Views by country: ", country_views)
+    except Exception as e: 
+        print("Error: Processing Task2A: {e}")
+    except FileNotFoundError: 
+        print("File not found: {json_file_path}")
+    except json.JSONDecodeError:
+        print("Invalid JSON format in file: {json_file_path}")
+
+def task2B(): 
+    """
+    TASK 2B: Views by Continent
+    """
+    json_file = input("Enter JSON file Path: ")
+    doc_id = input("Enter Document ID: ")
+
+
+    try:
+       continent_views = process_views_by_continent(doc_id, json_file)
+       print("Views by Continent: ", continent_views)
+       plot_chart(continent_views, "Views by Continent", "Continent", "View Count")
+    except Exception as e: 
+        print("Error in Processing Task 2B:", e)
+    
+def task3A(): 
+    json_file_path = input("Enter JSON File path: ")
+    
+    uA_counts = process_views_by_useragent(json_file_path)
+    if uA_counts: 
+        print("Useragent Counts: ", uA_counts)
+        plot_chart(uA_counts, "Views By Useragent", "Useragent", "View Count")
+    else: 
+        print("No useragent Data found!")   
+
+def task3B(): 
+
+    json_file_path = input("Enter JSON file Path: ")
+    browser_cnt = process_views_by_browser(json_file_path)
+    if browser_cnt: 
+        print("Browser Count: ", browser_cnt)
+        plot_chart(browser_cnt, "Views By Browser", "Browser", "View Count")
+    else: 
+        print("No Browser data found!")
+
+def task4():
+    """
+    Task 4: Identify the top 10 readers based on total reading time.
+    """
+    json_file_path = input("Enter JSON file path: ")
+
+    top_readers = calculate_top_readers(json_file_path)
+    if top_readers:
+        print("Top 10 Readers:")
+        for rank, (user_id, total_time) in enumerate(top_readers, start=1):
+            print(f"{rank}. User ID: {user_id}, Total Time: {total_time} seconds")
+    else:
+        print("No data found or unable to calculate reader profiles.")
+
+def task5D():
+    """
+    Task 5: Implement "Also Likes" functionality.
+    """
+    json_file_path = input("Enter JSON file path: ")
+    subject_doc_id = input("Enter document UUID: ")
+
+    top_related_docs = also_likes(json_file_path, subject_doc_id, sort_by_readers)
+    print("Top 10 Related Documents:")
+    for rank, doc_uuid in enumerate(top_related_docs, start=1):
+        print(f"{rank}. Document UUID: {doc_uuid}")
+
+def task6():
+    json_file_path = input("Enter JSON file path: ")
+    subject_doc_id = input("Enter Document UUID: ")
+    try:
+        # Call the logic from Task6
+        related_docs = also_likes(json_file_path, subject_doc_id, sort_by_readers)
+
+        readers = set()
+        also_like_documents = defaultdict(list)
+        with open(json_file_path, "r") as file:
+            for line in file:
+                event = json.loads(line)
+                doc_id = event.get("subject_doc_id")
+                visitor_id = event.get("visitor_uuid")
+                if doc_id in related_docs or doc_id == subject_doc_id:
+                    readers.add(visitor_id)
+                    also_like_documents[visitor_id].append(doc_id)
+
+        shortened_readers = {reader[-4:] for reader in readers}
+        shortened_also_like_documents = {
+            reader[-4:]: [doc[-4:] for doc in docs] for reader, docs in also_like_documents.items()
+        }
+        shortened_input_doc = subject_doc_id[-4:]
+
+        dot_file = "also_likes.dot"
+        output_file = "also_likes_graph.ps"
+        generate_dot_file(shortened_input_doc, shortened_readers, shortened_also_like_documents, dot_file)
+        create_graph(dot_file, output_file)
+        print("Graph visualization completed. Check also_likes_graph.ps.")
+    except Exception as e:
+        print(f"Error in Task 6: {e}")
+
+def task7():
+    launch_gui()
+
+# TASK 8
+# Here we will define our help function 
+# This will be used for users that are unsure of commands to be used 
+def help():
+    print("\n")
+    print("HELP LIST: ALL COMMANDS DEFINED BELOW")
+    print("Options: ")
+    print("\t-u --userID: UserID (OPTIONAL)")
+    print("\t-d --docID: Document ID, this is required to query (REQUIRED)")
+    print("\t-t --taskID: Task ID that will be used to perform the chosen task (REQUIRED)")
+    print("\t-f --filename: Input filename to run tasks (REQUIRED)")
+    print("\t-h --help: displays all commands to be entered")
+    print("\t-q --quit: Exit program\n")
+    print("\t-m --menu: Displays a menu where you can access a simplier menu and access the GUI")
+
+if __name__ == "__main__": 
+    # opt - option
+    # opt_value - option value 
+    # This will load up to begin with giving the user an option of using cmd lines or the main menu 
+    # From there users can 
+    try: 
+        opts, args = getopt.getopt(sys.argv[1:], 'u:d:t:f:hqm', ['userID=', 'docID=','taskID=', 'filename=', 'help', 'quit', 'menu'])
+        json_file_path = ""
+        userID = 0
+        docID = 0
+        tsk_id = "" 
+        for opt_name, opt_value in opts: 
+            if opt_name in ('-u', '--userID'):
+                userID = opt_value
+            elif opt_name in ('-d', '--docID'): 
+                docID = opt_value
+            elif opt_name in ('-t', '--taskID'): # Get task ID
+                # We need to check the TaskID to make sure it is valid 
+                print("task ID: ", opt_value)
+                if opt_value in ('2a', '2b', '3a', '3b', '4', '5d', '6', '7'):
+                    tsk_id = opt_value
+                else: 
+                    print("TaskID is incorrect. Please Enter the Correct taskID", opt_value)
+                    sys.exit()
+            elif opt_name in ('-f', '--filename'): 
+                file_exists = os.path.isfile(opt_value)
+                if file_exists:
+                    pattern = re.compile(r'\.json\Z')
+                    print(opt_value)
+                    t = pattern.search(opt_value)
+                    if t is not None:
+                        #print("File input: ", filename = os.path.abspath(opt_value)) 
+                        json_file_path = os.path.abspath(opt_value)                        
+                    elif pattern := re.compile(r'\.dot\N'):
+                        print(opt_value)
+                        t = pattern.search(opt_value)
+                        if t is not None:
+                            json_file_path = os.path.abspath(opt_value)
+                        else: 
+                            print("Incorrect File type: ", opt_value, " Not a JSON file")
+                            sys.exit()
+                else: 
+                    print("File does not exist: ", opt_value)
+                    sys.exit()
+            elif opt_name in ('-h', '--help'): 
+                help() # If user is unsure about entering values and the format. this will display all options
+                sys.exit()
+            elif opt_name in ('-m', '--menu'): 
+                mainMenu()
+            # Ensure that Filename and taskID have been entered 
+            if json_file_path == "": 
+                print("No file entered", opt_value)
+                sys.exit()
+            if tsk_id == 0: 
+                print("No TaskID has been entered")
+                sys.exit()
+            if tsk_id == "2a": 
+                print("Starting Task 2a with params docID (", docID,") and json (", json_file_path, ") \n")
+                result = process_views_by_country(docID, json_file_path)
+                print("TASK 2A RESULT: ", result)
+            elif tsk_id == "2b": 
+                result = process_views_by_continent(docID, json_file_path)
+                print("TASK 2B: ", result)
+            elif tsk_id == "3a": 
+                result = process_views_by_useragent(json_file_path)
+                print("TASK 3A: ", result)
+            elif tsk_id == "3b": 
+                result = process_views_by_browser(json_file_path)
+                print("TASK 3B: ", result)
+            elif tsk_id == "4": 
+                result = calculate_top_readers(json_file_path)
+                print("TASK 4: ", result)
+            elif tsk_id == "5d": 
+                print("Top 10 Related Documents:")
+                for rank, doc_uuid in enumerate(also_likes(json_file_path, docID, sort_by_readers), start=1):
+                    print(f"{rank}. Document UUID: {doc_uuid}")
+            elif tsk_id == "6":
+                    print(f"Starting Task 6: 'Also Likes Graph' with params docID ({docID}) and json ({json_file_path}) \n")
+                    try:
+                        related_docs = also_likes(json_file_path, docID, sort_by_readers)
+                        readers = set()
+                        also_like_documents = defaultdict(list)
+
+                        with open(json_file_path, "r") as file:
+                            for line in file:
+                                event = json.loads(line)
+                                doc_id = event.get("subject_doc_id")
+                                visitor_id = event.get("visitor_uuid")
+                                if doc_id in related_docs or doc_id == docID:
+                                    readers.add(visitor_id)
+                                    also_like_documents[visitor_id].append(doc_id)
+
+                        # Shorten IDs for clarity in graph
+                        shortened_readers = {reader[-4:] for reader in readers}
+                        shortened_also_like_documents = {
+                            reader[-4:]: [doc[-4:] for doc in docs] for reader, docs in also_like_documents.items()
+                        }
+                        shortened_input_doc = docID[-4:]
+
+                        # Generate DOT and visualize graph
+                        dot_file = "also_likes.dot"
+                        output_file = "also_likes_graph.ps"
+                        generate_dot_file(shortened_input_doc, shortened_readers, shortened_also_like_documents, dot_file)
+                        create_graph(dot_file, output_file)
+                        print(f"Graph visualization completed. Check the output file: {output_file}")
+                    except Exception as e:
+                        print(f"Error processing Task 6: {e}")
+            elif tsk_id == "7": 
+                launch_gui()
+
+    except getopt.GetoptError as error: 
+        print(error, "\n")
+        help()
+        sys.exit(1)
+            
+
+   
+   
+    
+
+
